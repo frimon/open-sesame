@@ -1,3 +1,4 @@
 *.o
 outfile.hex
 outfile.elf
+.deps

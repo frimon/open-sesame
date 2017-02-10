@@ -21,6 +21,15 @@ int servo_clockwise = 1;
 int mytime = 0x5957;
 int counter = 0;
 int timerCounter = 0;
+int rfid_clock = 1;
+
+// 30, 31, 32, 33
+// 30 = PORTE[4] = SCLK (klocka - utgång)
+// 31 = PORTE[5] = MOSI (master out - utgång)
+// 32 = PORTE[6] = MISO (master in - ingång)
+// 33 = PORTE[7] = SS (aktiv låg - utgång)
+
+//volatile int *rfid_address = (volatile int*) 0x28;
 
 char textstring[] = "text, more text, and even more text!";
 
@@ -48,13 +57,10 @@ void labinit( void )
   OC1R = CLOCKWISE;
   OC1RS = CLOCKWISE + 3;
 
-/*
-  OC1R = 0x3000;
-  OC1RS = 0x3003;
-  */
-
   T2CONSET = 1 << 15; // Starta klockan
-  //OC1CON = OC1CON | (1 << 15); // Starta oc
+
+  TRISE = (TRISE & 0xffffff0f) | (1 << 6);
+  PORTECLR = 1 << 7;
 
   return;
 }
@@ -93,14 +99,22 @@ void labwork( void )
   if (buttons && !buttons_pushed) {
 
     OC1CON = (OC1CON & 0xffff7fff) | 1 << 15;
-    display_string( 3, "on");
+    //display_string( 3, "on");
     buttons_pushed = 1;
   } else if (!buttons && buttons_pushed) {
 
     OC1CON &= 0xffff7fff;
-    display_string( 3, "off");
+    //display_string( 3, "off");
     buttons_pushed = 0;
   }
+
+/*
+  if (*rfid_address == 0) {
+    display_string(3, "equals zero");
+  } else {
+    display_string(3, "not zero");
+  }
+  */
 
 
   /*
@@ -135,10 +149,61 @@ void labwork( void )
     IFS(0) = 0;
   }
 
+  int rfid_in = (PORTE >> 6) & 1;
+  if (rfid_in) {
+    display_string( 3, "1");
+  } else {
+    display_string( 3, "0");
+  }
+
   // Om vår egna räknare är mindre än 10, ignorera koden nedan.
-  if (timerCounter < 50) {
+  if (timerCounter < 200) {
     return;
   }
+
+  rfid_clock = !rfid_clock;
+
+  if (rfid_clock) {
+
+    // if raising edge
+    PORTESET = 1 << 4;
+
+  } else {
+
+    // if falling edge
+    PORTECLR = 1 << 4;
+
+    switch (counter) {
+
+      // 3
+      case 0: display_string( 2, "counter 0"); PORTECLR = 1 << 5; break;
+      case 1: display_string( 2, "counter 1"); PORTECLR = 1 << 5; break;
+      case 2: display_string( 2, "counter 2"); PORTESET = 1 << 5; break;
+      case 3: display_string( 2, "counter 3"); PORTESET = 1 << 5; break;
+
+      // 7
+      case 4: display_string( 2, "counter 4"); PORTECLR = 1 << 5; break;
+      case 5: display_string( 2, "counter 5"); PORTESET = 1 << 5; break;
+      case 6: display_string( 2, "counter 6"); PORTESET = 1 << 5; break;
+      case 7: display_string( 2, "counter 7"); PORTESET = 1 << 5; counter = -1; break;
+    }
+
+    counter++;
+
+    //display_string( 3, "falling edge");
+  }
+
+  /*
+  if (counter < 20) {
+    PORTESET = 1 << 6;
+  } else {
+    PORTECLR = 1 << 6;
+
+    if (counter > 24) {
+      counter = 0;
+    }
+  }
+  */
 
   /*
   if (servo_clockwise) {

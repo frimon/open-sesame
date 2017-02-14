@@ -23,13 +23,12 @@ int counter = 0;
 int timerCounter = 0;
 int rfid_clock = 1;
 
-// 30, 31, 32, 33
-// 30 = PORTE[4] = SCLK (klocka - utgång)
-// 31 = PORTE[5] = MOSI (master out - utgång)
-// 32 = PORTE[6] = MISO (master in - ingång)
-// 33 = PORTE[7] = SS (aktiv låg - utgång)
-
-//volatile int *rfid_address = (volatile int*) 0x28;
+/*
+SDI1/MISO = PIN 0       PORT F2
+SDO1/MOSI = PIN 1       PORT F3
+SCK1      = PIN 38      PORT F6
+SS1       = PIN 14 (A0) PORT B2
+*/
 
 char textstring[] = "text, more text, and even more text!";
 
@@ -39,13 +38,46 @@ void user_isr( void )
   return;
 }
 
+/*
+uint8_t spi_send_receive(uint8_t send) {
+
+  PORTESET = 1;
+  SPI1BUF = send;
+  while ((SPI1STAT >> 11) & 1);
+
+  PORTECLR = 1;
+
+  return SPI1BUF;
+}
+*/
+
+/*
+uint8_t read_register(uint8_t reg) {
+
+  // select slave
+  spi_send_receive(0x80 | (reg & 0x7e));
+  uint8_t response = spi_send_receive(0);
+
+  // unselect slave
+  return response;
+}
+*/
+
+uint8_t spi_send_receive(uint8_t data) {
+
+  while(!(SPI1STAT & 0x08));
+  SPI1BUF = data;
+  while(!(SPI1STAT & 1));
+  return SPI1BUF;
+}
+
 /* Lab-specific initialization goes here */
 void labinit( void )
 {
 
   // 80000000/256/31250
 
-  TRISD |= (0x7f << 5); // 5 through 11 to ones
+  //TRISD |= (0x7f << 5); // 5 through 11 to ones
 
   T2CON = 5 << 4;     // 1:32 scaling
   TMR2 = 0;           // Nollställ klockan
@@ -57,10 +89,41 @@ void labinit( void )
   OC1R = CLOCKWISE;
   OC1RS = CLOCKWISE + 3;
 
+  TRISDSET = 1 << 7;
+
+  TRISFSET = 1 << 2;
+  //TRISFCLR = 0x48;
+  TRISBCLR = 4;
+
+  char junk;
+  SPI1CON = 0;
+  //SPI1CONCLR = 1 << 15; // SPI Peripheral On bit
+  junk = SPI1BUF;
+  //SPI1BRG = 7;
+
+  // Test fredriks kod
+  SPI1BRG = 4;
+  SPI1STATCLR = 0x40;
+  /*
+  SPI1CONSET = 0x40;
+  SPI1CONSET = 0x20;
+  SPI1CONSET = 0x8000;
+  */
+  SPI1CONSET = 1 << 5; // Master Mode Slave Select Enable bit
+  SPI1CONSET = 1 << 8;  // SPI Clock Edge Select bit
+  SPI1CONSET = 1 << 15; // SPI Peripheral On bit
+
   T2CONSET = 1 << 15; // Starta klockan
 
-  TRISE = (TRISE & 0xffffff0f) | (1 << 6);
-  PORTECLR = 1 << 7;
+  //TRISE = (TRISE & 0xffffff0f) | (1 << 6);
+  TRISECLR = 1 << 7;
+  PORTESET = 1 << 7;
+
+  /*
+  for (int i = 0; i < 25; i++) {
+    spi_send_receive(0x00);
+  }
+  */
 
   return;
 }
@@ -108,40 +171,6 @@ void labwork( void )
     buttons_pushed = 0;
   }
 
-/*
-  if (*rfid_address == 0) {
-    display_string(3, "equals zero");
-  } else {
-    display_string(3, "not zero");
-  }
-  */
-
-
-  /*
-  if (button4 == 1) {
-    OC1CON = (OC1CON & 0xffff7fff) | 1 << 15;
-    display_string( 3, "on");
-  } else {
-    OC1CON &= 0xffff7fff;
-    display_string( 3, "off");
-  }
-  */
-
-/*
-    int button4 = buttons & (1 << 2);
-
-    // Är knapp 4 intryckt?
-    if (button4) {
-      OC1CON = (OC1CON & 0xffff7fff) | 1 << 15;
-
-      display_string( 3, "on");
-    } else {
-      OC1CON &= 0xffff7fff;
-      display_string( 3, "off");
-    }
-  }
-  */
-
   // Om timeout flaggan är 1, räkna upp timerCounter och nollställ timeoutflaggan.
   if (IFS(0) & 0x100) {
 
@@ -149,49 +178,33 @@ void labwork( void )
     IFS(0) = 0;
   }
 
-  int rfid_in = (PORTE >> 6) & 1;
-  if (rfid_in) {
-    display_string( 3, "1");
-  } else {
-    display_string( 3, "0");
-  }
-
   // Om vår egna räknare är mindre än 10, ignorera koden nedan.
-  if (timerCounter < 200) {
+  if (timerCounter < 100) {
     return;
   }
 
-  rfid_clock = !rfid_clock;
+  unsigned char received;
+  spi_send_receive(0xEE);
+  received = spi_send_receive(0x00);
+  unsigned char digit1 = received >> 4;
+  unsigned char digit2 = received & 0x0f;
 
-  if (rfid_clock) {
+  digit1 += digit1 <= 9 ? 0x30 : 0x37;
+  digit2 += digit1 <= 9 ? 0x30 : 0x37;
 
-    // if raising edge
-    PORTESET = 1 << 4;
+  char out[3] = {
+    digit1,
+    digit2,
+    0x00
+  };
 
+  if ((PORTF >> 2) & 1) {
+    display_string(3, "1");
   } else {
-
-    // if falling edge
-    PORTECLR = 1 << 4;
-
-    switch (counter) {
-
-      // 3
-      case 0: display_string( 2, "counter 0"); PORTECLR = 1 << 5; break;
-      case 1: display_string( 2, "counter 1"); PORTECLR = 1 << 5; break;
-      case 2: display_string( 2, "counter 2"); PORTESET = 1 << 5; break;
-      case 3: display_string( 2, "counter 3"); PORTESET = 1 << 5; break;
-
-      // 7
-      case 4: display_string( 2, "counter 4"); PORTECLR = 1 << 5; break;
-      case 5: display_string( 2, "counter 5"); PORTESET = 1 << 5; break;
-      case 6: display_string( 2, "counter 6"); PORTESET = 1 << 5; break;
-      case 7: display_string( 2, "counter 7"); PORTESET = 1 << 5; counter = -1; break;
-    }
-
-    counter++;
-
-    //display_string( 3, "falling edge");
+    display_string(3, "0");
   }
+
+  display_string(3, out);
 
   /*
   if (counter < 20) {

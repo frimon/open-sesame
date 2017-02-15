@@ -24,10 +24,10 @@ int timerCounter = 0;
 int rfid_clock = 1;
 
 /*
-SDI1/MISO = PIN 0       PORT F2
-SDO1/MOSI = PIN 1       PORT F3
-SCK1      = PIN 38      PORT F6
-SS1       = PIN 14 (A0) PORT B2
+SDI1/MISO = PIN 12  PORT G7
+SDO1/MOSI = PIN 11  PORT G8
+SCK1      = PIN 13  PORT G6
+SS1       = PIN 33  PORT E7
 */
 
 char textstring[] = "text, more text, and even more text!";
@@ -63,6 +63,7 @@ uint8_t read_register(uint8_t reg) {
 }
 */
 
+/*
 uint8_t spi_send_receive(uint8_t data) {
 
   while(!(SPI1STAT & 0x08));
@@ -70,6 +71,7 @@ uint8_t spi_send_receive(uint8_t data) {
   while(!(SPI1STAT & 1));
   return SPI1BUF;
 }
+*/
 
 /* Lab-specific initialization goes here */
 void labinit( void )
@@ -78,6 +80,14 @@ void labinit( void )
   // 80000000/256/31250
 
   //TRISD |= (0x7f << 5); // 5 through 11 to ones
+
+  TRISDCLR = 1 << 4; // Sätter SS1 som output
+  TRISGCLR = 5 << 6; // Sätter SCK1 och MOSI som outputs
+  TRISGSET = 1 << 7; // Sätter MISO som input
+  TRISECLR = 0xff;
+
+  //PORTDSET = 1 << 4; // Sätter slave select till 1
+  PORTESET = 1 << 7;
 
   T2CON = 5 << 4;     // 1:32 scaling
   TMR2 = 0;           // Nollställ klockan
@@ -89,35 +99,33 @@ void labinit( void )
   OC1R = CLOCKWISE;
   OC1RS = CLOCKWISE + 3;
 
-  TRISDSET = 1 << 7;
-
-  TRISFSET = 1 << 2;
-  //TRISFCLR = 0x48;
-  TRISBCLR = 4;
-
-  char junk;
-  SPI1CON = 0;
+  //char junk;
+  //SPI2CON = 0;
   //SPI1CONCLR = 1 << 15; // SPI Peripheral On bit
-  junk = SPI1BUF;
+  //junk = SPI2BUF;
   //SPI1BRG = 7;
 
   // Test fredriks kod
-  SPI1BRG = 4;
-  SPI1STATCLR = 0x40;
+  /*
+  SPI2BRG = 4;
+  SPI2STATCLR = 0x40;
+  */
   /*
   SPI1CONSET = 0x40;
   SPI1CONSET = 0x20;
   SPI1CONSET = 0x8000;
   */
-  SPI1CONSET = 1 << 5; // Master Mode Slave Select Enable bit
-  SPI1CONSET = 1 << 8;  // SPI Clock Edge Select bit
-  SPI1CONSET = 1 << 15; // SPI Peripheral On bit
+  /*
+  SPI2CONSET = 1 << 5; // Master Mode Slave Select Enable bit
+  SPI2CONSET = 1 << 8;  // SPI Clock Edge Select bit
+  SPI2CONSET = 1 << 15; // SPI Peripheral On bit
+  */
 
   T2CONSET = 1 << 15; // Starta klockan
 
   //TRISE = (TRISE & 0xffffff0f) | (1 << 6);
-  TRISECLR = 1 << 7;
-  PORTESET = 1 << 7;
+  //TRISECLR = 1 << 7;
+  //PORTESET = 1 << 7;
 
   /*
   for (int i = 0; i < 25; i++) {
@@ -183,26 +191,50 @@ void labwork( void )
     return;
   }
 
+  display_string(0, itoaconv(counter));
+  counter++;
+
   unsigned char received;
+  /*
+
   spi_send_receive(0xEE);
   received = spi_send_receive(0x00);
+  */
+
+  PORTFCLR = 0x10; // DISPLAY_CHANGE_TO_COMMAND_MODE
+
+  //PORTDCLR = 1 << 4; // Sätter slave select till 0
+  PORTECLR = 1 << 7;
+  spi_send_recv(0xEE);
+  received = spi_send_recv(0);
+  PORTESET = 1 << 7;
+  //PORTDSET = 1 << 4; // Sätter slave select till 1
+
+  PORTFSET = 0x10; // DISPLAY_CHANGE_TO_DATA_MODE
+
+  //PORTESET = received;
+
   unsigned char digit1 = received >> 4;
   unsigned char digit2 = received & 0x0f;
 
   digit1 += digit1 <= 9 ? 0x30 : 0x37;
-  digit2 += digit1 <= 9 ? 0x30 : 0x37;
+  digit2 += digit2 <= 9 ? 0x30 : 0x37;
 
-  char out[3] = {
+  char out[] = {
+    '0',
+    'x',
     digit1,
     digit2,
     0x00
   };
 
+  /*
   if ((PORTF >> 2) & 1) {
     display_string(3, "1");
   } else {
     display_string(3, "0");
   }
+  */
 
   display_string(3, out);
 

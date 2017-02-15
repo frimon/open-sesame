@@ -13,6 +13,7 @@
 #include <stdint.h>   /* Declarations of uint_32 and the like */
 #include <pic32mx.h>  /* Declarations of system-specific addresses etc */
 #include "mipslab.h"  /* Declatations for these labs */
+#include "rfid.h" /* Declarations for RFID */
 
 const CLOCKWISE = 0x3000;
 const COUNTER_CLOCKWISE = 0x500;
@@ -23,14 +24,28 @@ int counter = 0;
 int timerCounter = 0;
 int rfid_clock = 1;
 
-/*
-SDI1/MISO = PIN 12  PORT G7
-SDO1/MOSI = PIN 11  PORT G8
-SCK1      = PIN 13  PORT G6
-SS1       = PIN 33  PORT E7
-*/
+
 
 char textstring[] = "text, more text, and even more text!";
+
+/* Char to hexstring */
+char* char_to_hexstring (uint8_t data) {
+  unsigned char digit1 = data >> 4;
+  unsigned char digit2 = data & 0x0f;
+
+  digit1 += digit1 <= 9 ? 0x30 : 0x37; // Convert to Ascii
+  digit2 += digit2 <= 9 ? 0x30 : 0x37;
+
+  char out[] = {
+    '0',
+    'x',
+    digit1,
+    digit2,
+    0x00
+  };
+
+  return out;
+}
 
 /* Interrupt Service Routine */
 void user_isr( void )
@@ -38,56 +53,13 @@ void user_isr( void )
   return;
 }
 
-/*
-uint8_t spi_send_receive(uint8_t send) {
-
-  PORTESET = 1;
-  SPI1BUF = send;
-  while ((SPI1STAT >> 11) & 1);
-
-  PORTECLR = 1;
-
-  return SPI1BUF;
-}
-*/
-
-/*
-uint8_t read_register(uint8_t reg) {
-
-  // select slave
-  spi_send_receive(0x80 | (reg & 0x7e));
-  uint8_t response = spi_send_receive(0);
-
-  // unselect slave
-  return response;
-}
-*/
-
-/*
-uint8_t spi_send_receive(uint8_t data) {
-
-  while(!(SPI1STAT & 0x08));
-  SPI1BUF = data;
-  while(!(SPI1STAT & 1));
-  return SPI1BUF;
-}
-*/
-
 /* Lab-specific initialization goes here */
 void labinit( void )
 {
 
-  // 80000000/256/31250
+  // 80000000/256/31250 = 10
 
-  //TRISD |= (0x7f << 5); // 5 through 11 to ones
-
-  TRISDCLR = 1 << 4; // Sätter SS1 som output
-  TRISGCLR = 5 << 6; // Sätter SCK1 och MOSI som outputs
-  TRISGSET = 1 << 7; // Sätter MISO som input
-  TRISECLR = 0xff;
-
-  //PORTDSET = 1 << 4; // Sätter slave select till 1
-  PORTESET = 1 << 7;
+  rfid_init();
 
   T2CON = 5 << 4;     // 1:32 scaling
   TMR2 = 0;           // Nollställ klockan
@@ -99,42 +71,12 @@ void labinit( void )
   OC1R = CLOCKWISE;
   OC1RS = CLOCKWISE + 3;
 
-  //char junk;
-  //SPI2CON = 0;
-  //SPI1CONCLR = 1 << 15; // SPI Peripheral On bit
-  //junk = SPI2BUF;
-  //SPI1BRG = 7;
-
-  // Test fredriks kod
-  /*
-  SPI2BRG = 4;
-  SPI2STATCLR = 0x40;
-  */
-  /*
-  SPI1CONSET = 0x40;
-  SPI1CONSET = 0x20;
-  SPI1CONSET = 0x8000;
-  */
-  /*
-  SPI2CONSET = 1 << 5; // Master Mode Slave Select Enable bit
-  SPI2CONSET = 1 << 8;  // SPI Clock Edge Select bit
-  SPI2CONSET = 1 << 15; // SPI Peripheral On bit
-  */
-
   T2CONSET = 1 << 15; // Starta klockan
-
-  //TRISE = (TRISE & 0xffffff0f) | (1 << 6);
-  //TRISECLR = 1 << 7;
-  //PORTESET = 1 << 7;
-
-  /*
-  for (int i = 0; i < 25; i++) {
-    spi_send_receive(0x00);
-  }
-  */
 
   return;
 }
+
+/* Motor */
 
 int buttons_pushed = 0;
 int button2_pushed = 0;
@@ -144,7 +86,7 @@ int button4_pushed = 0;
 /* This function is called repetitively from the main program */
 void labwork( void )
 {
-
+  /* Motor */
   int buttons = getbtns();
   int button4 = (buttons >> 2) & 1;
 
@@ -179,6 +121,8 @@ void labwork( void )
     buttons_pushed = 0;
   }
 
+  /* Timer */
+
   // Om timeout flaggan är 1, räkna upp timerCounter och nollställ timeoutflaggan.
   if (IFS(0) & 0x100) {
 
@@ -191,52 +135,11 @@ void labwork( void )
     return;
   }
 
-  display_string(0, itoaconv(counter));
-  counter++;
+  uint8_t received = rfid_read_register(0x37);
 
-  unsigned char received;
-  /*
+  display_string(3, char_to_hexstring(received));
 
-  spi_send_receive(0xEE);
-  received = spi_send_receive(0x00);
-  */
-
-  PORTFCLR = 0x10; // DISPLAY_CHANGE_TO_COMMAND_MODE
-
-  //PORTDCLR = 1 << 4; // Sätter slave select till 0
-  PORTECLR = 1 << 7;
-  spi_send_recv(0xEE);
-  received = spi_send_recv(0);
-  PORTESET = 1 << 7;
-  //PORTDSET = 1 << 4; // Sätter slave select till 1
-
-  PORTFSET = 0x10; // DISPLAY_CHANGE_TO_DATA_MODE
-
-  //PORTESET = received;
-
-  unsigned char digit1 = received >> 4;
-  unsigned char digit2 = received & 0x0f;
-
-  digit1 += digit1 <= 9 ? 0x30 : 0x37;
-  digit2 += digit2 <= 9 ? 0x30 : 0x37;
-
-  char out[] = {
-    '0',
-    'x',
-    digit1,
-    digit2,
-    0x00
-  };
-
-  /*
-  if ((PORTF >> 2) & 1) {
-    display_string(3, "1");
-  } else {
-    display_string(3, "0");
-  }
-  */
-
-  display_string(3, out);
+  /* Motor (Kanske behövs) */
 
   /*
   if (counter < 20) {
@@ -267,13 +170,7 @@ void labwork( void )
   // Om räknaren har räknat upp till 10, nollställ och räkna sen upp klocka etc.
   timerCounter = 0;
 
-  //PORTD = 0xffffffff;
-
-  //delay( 1000 );
-  //time2string( textstring, mytime );
-  //display_string( 3, textstring );
-
   display_update();
-  tick( &mytime );
-  display_image(96, icon);
+  //tick( &mytime );
+  //display_image(96, icon);
 }

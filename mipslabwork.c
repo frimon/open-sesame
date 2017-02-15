@@ -22,6 +22,7 @@ int mytime = 0x5957;
 int counter = 0;
 int timerCounter = 0;
 int rfid_clock = 1;
+unsigned char in_digits = 0;
 
 // 30, 31, 32, 33
 // 30 = PORTE[4] = SCLK (klocka - utgång)
@@ -57,10 +58,12 @@ void labinit( void )
   OC1R = CLOCKWISE;
   OC1RS = CLOCKWISE + 3;
 
-  T2CONSET = 1 << 15; // Starta klockan
+  TRISESET = 1 << 6;
+  TRISECLR = 0x0B << 4;
+  //TRISE = (TRISE & 0xffffff0f) | (1 << 6);
+  PORTECLR = 1 << 7; // Skicka noll till slave select
 
-  TRISE = (TRISE & 0xffffff0f) | (1 << 6);
-  PORTECLR = 1 << 7;
+  T2CONSET = 1 << 15; // Starta klockan
 
   return;
 }
@@ -149,15 +152,8 @@ void labwork( void )
     IFS(0) = 0;
   }
 
-  int rfid_in = (PORTE >> 6) & 1;
-  if (rfid_in) {
-    display_string( 3, "1");
-  } else {
-    display_string( 3, "0");
-  }
-
   // Om vår egna räknare är mindre än 10, ignorera koden nedan.
-  if (timerCounter < 200) {
+  if (timerCounter < 20) {
     return;
   }
 
@@ -168,24 +164,86 @@ void labwork( void )
     // if raising edge
     PORTESET = 1 << 4;
 
+    int rfid_in = (PORTE >> 6) & 1;
+    if (rfid_in) {
+      display_string( 3, "IN: 1");
+    } else {
+      display_string( 3, "IN: 0");
+    }
+
+    int shift = 8 - counter;
+    if (counter > 8) {
+      shift = 16 - counter;
+    }
+
+    in_digits |= rfid_in << shift;
+
+    display_string( 0, itoaconv( counter - 1 ) );
+    //display_string( 1, itoaconv( shift ) );
+    //display_string( 1, itoaconv( in_digits ) );
+
+    unsigned char digit1 = in_digits >> 4;
+    unsigned char digit2 = in_digits & 0x0f;
+
+    switch ((counter - 1)) {
+      case 7:
+      case 15:
+
+        digit1 += digit1 <= 9 ? 0x30 : 0x37;
+        digit2 += digit2 <= 9 ? 0x30 : 0x37;
+
+        char out[] = {
+          '0',
+          'x',
+          digit1,
+          digit2,
+          0x00
+        };
+
+
+        display_string(2, out);
+
+        break;
+    }
+
+    if (counter - 1 == 15) {
+      counter = 0;
+    }
+
   } else {
 
     // if falling edge
     PORTECLR = 1 << 4;
 
+    if (counter == 0 || counter == 7) {
+      in_digits = 0;
+    }
+
     switch (counter) {
 
-      // 3
-      case 0: display_string( 2, "counter 0"); PORTECLR = 1 << 5; break;
-      case 1: display_string( 2, "counter 1"); PORTECLR = 1 << 5; break;
-      case 2: display_string( 2, "counter 2"); PORTESET = 1 << 5; break;
-      case 3: display_string( 2, "counter 3"); PORTESET = 1 << 5; break;
+      // E
+      case 0: PORTESET = 1 << 5; break;
+      case 1: PORTESET = 1 << 5; break;
+      case 2: PORTESET = 1 << 5; break;
+      case 3: PORTECLR = 1 << 5; break;
 
-      // 7
-      case 4: display_string( 2, "counter 4"); PORTECLR = 1 << 5; break;
-      case 5: display_string( 2, "counter 5"); PORTESET = 1 << 5; break;
-      case 6: display_string( 2, "counter 6"); PORTESET = 1 << 5; break;
-      case 7: display_string( 2, "counter 7"); PORTESET = 1 << 5; counter = -1; break;
+      // E
+      case 4: PORTESET = 1 << 5; break;
+      case 5: PORTESET = 1 << 5; break;
+      case 6: PORTESET = 1 << 5; break;
+      case 7: PORTECLR = 1 << 5; break;
+
+      // Send 0x00
+      case 8:  PORTECLR = 1 << 5; break;
+      case 9:  PORTECLR = 1 << 5; break;
+      case 10: PORTECLR = 1 << 5; break;
+      case 11: PORTECLR = 1 << 5; break;
+      case 12: PORTECLR = 1 << 5; break;
+      case 13: PORTECLR = 1 << 5; break;
+      case 14: PORTECLR = 1 << 5; break;
+      case 15:
+        PORTECLR = 1 << 5;
+      break;
     }
 
     counter++;

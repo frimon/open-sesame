@@ -23,13 +23,13 @@ int mytime = 0x5957;
 int counter = 0;
 int timerCounter = 0;
 int rfid_clock = 1;
-
-
+char fifo_buffer[64];
 
 char textstring[] = "text, more text, and even more text!";
 
 /* Char to hexstring */
 char* char_to_hexstring (uint8_t data) {
+
   unsigned char digit1 = data >> 4;
   unsigned char digit2 = data & 0x0f;
 
@@ -37,11 +37,7 @@ char* char_to_hexstring (uint8_t data) {
   digit2 += digit2 <= 9 ? 0x30 : 0x37;
 
   char out[] = {
-    '0',
-    'x',
-    digit1,
-    digit2,
-    0x00
+    '0', 'x', digit1, digit2, 0
   };
 
   return out;
@@ -52,6 +48,8 @@ void user_isr( void )
 {
   return;
 }
+
+
 
 /* Lab-specific initialization goes here */
 void labinit( void )
@@ -72,6 +70,18 @@ void labinit( void )
   OC1RS = CLOCKWISE + 3;
 
   T2CONSET = 1 << 15; // Starta klockan
+
+  rfid_write_register(0x01, 0x0f); // Soft reset
+  int i;
+  for (i = 0; i < 25; i++) {
+    rfid_write_register(0x00, 0x00); // Sending 0x00 25 times to clear buffer
+  }
+
+  rfid_write_register(0x36, 0x09); // Enable autotestreg
+  rfid_write_register(0x09, 0x00); // Write 0x00 to fifo buffer
+  rfid_write_register(0x01, 0x03); // Start self test with CalcCRC command
+
+  rfid_read_fifo(&fifo_buffer);
 
   return;
 }
@@ -135,9 +145,24 @@ void labwork( void )
     return;
   }
 
-  uint8_t received = rfid_read_register(0x37);
+  //rfid_write_register(0x01, 0x00); // CommandReg, PCD_Idle
+  //rfid_write_register(0x04, 0x7F); // ComIrqReg, ???
+  // PCD_SetRegisterBitMask(FIFOLevelReg, 0x80);
+  //rfid_write_register(0x09, 0x26); // FIFODataReg, SendData (PICC_CMD_REQA)
+  // PCD_WriteRegister(BitFramingReg, bitFraming);
+  //rfid_write_register(0x01, 0x0C); // CommandReg, PCD_Idle
 
+  /*
+  uint8_t received = rfid_read_register(0x09);
   display_string(3, char_to_hexstring(received));
+  */
+
+  display_string(1, char_to_hexstring(counter));
+  display_string(3, char_to_hexstring(fifo_buffer[counter]));
+  counter++;
+
+  //uint8_t received = rfid_read_register(0x37);
+  //display_string(3, char_to_hexstring(received));
 
   /* Motor (Kanske behövs) */
 

@@ -40,3 +40,34 @@ void rfid_write_register(uint8_t reg, uint8_t value) {
 uint8_t rfid_read_register(uint8_t reg) {
   return rfid_send_data(0x80 | ((reg << 1) & 0x7E), 0);
 }
+
+uint8_t* rfid_read_fifo(char fifo_buffer[]) {
+
+  PORTFSET = 0x10; // DISPLAY_CHANGE_TO_DATA_MODE
+  PORTECLR = 1 << 7; // Sätter till att RFID-kortet ska agera som slave
+
+  //uint8_t count = rfid_read_register(0x0A) & 0x7F;
+  uint8_t count = 64;
+
+  int i;
+  //char buffer[count];
+  spi_send_recv(0x80 | ((0x09 << 1) & 0x7E));
+
+  //quicksleep(99999);
+
+  for (i = 0; i < count; i++) {
+
+    quicksleep(1000);
+
+    if (i == count - 1) {
+      fifo_buffer[i] = spi_send_recv(0);
+    } else {
+      fifo_buffer[i] = spi_send_recv(0x80 | ((0x09 << 1) & 0x7E));
+    }
+
+    //spi_send_recv(0); // null byte
+  }
+
+  PORTESET = 1 << 7; // Sätter att RFID-kortet inte längre är slave
+  PORTFCLR = 0x10; // DISPLAY_CHANGE_TO_COMMAND_MODE
+}

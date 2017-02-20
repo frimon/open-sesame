@@ -162,7 +162,7 @@ void labwork( void )
 
   //display_string(0, itoaconv(counter));
 
-  uint8_t waitIRq = 0x77;
+  uint8_t waitIRq = 0x30;
   uint8_t irqEn = 0x77;
 
   rfid_write_register(0x0D, 0x07); // self.Write_MFRC522(self.BitFramingReg, 0x07)
@@ -176,21 +176,45 @@ void labwork( void )
   rfid_write_register(0x01, 0x0C); // self.Write_MFRC522(self.CommandReg, command) --> PCD_TRANSCEIVE
   rfid_set_register_bitmask(0x0D, 0x80); // self.SetBitMask(self.BitFramingReg, 0x80)
 
-  int i = 25;
+  int i = 100;
   uint8_t n;
 
   do {
     quicksleep(100);
-    n = rfid_read_register(0x04);
+    n = rfid_read_register(0x04); // Reading from CommIrqReg
     i--;
   } while ((i!=0) && !(n&0x01) && !(n&waitIRq));
 
+  display_string(0, char_to_hexstring(n));
+  display_string(1, itoaconv(i));
+
+  uint8_t error = rfid_read_register(0x06);
+  //display_string(2, char_to_hexstring(error));
+
+  if (!(error & 0x1B)) {
+    display_string(3, "MI_OK");
+
+    if (n & irqEn & 0x01) {
+      display_string(3, "MI_NOTAGERR");
+    } else {
+      n = rfid_read_register(0x0A);
+    }
+  } else {
+    display_string(2, "MI_ERR");
+  }
+
+  //char* buffer = rfid_read_fifo();
+  //display_string(2, buffer[1]);
+
+  /*
   display_string(1, itoaconv(i));
   display_string(2, char_to_hexstring(n));
+  */
 
   rfid_clear_register_bitmask(0x0D, 0x80);
 
   // Starting anticoll
+  /*
   rfid_write_register(0x0D, 0x00); // self.Write_MFRC522(self.BitFramingReg, 0x00)
 
   rfid_write_register(0x02, irqEn | 0x80);  // self.Write_MFRC522(self.CommIEnReg, irqEn|0x80)
@@ -205,6 +229,14 @@ void labwork( void )
   rfid_write_register(0x01, 0x0C); // self.Write_MFRC522(self.CommandReg, command) --> PCD_TRANSCEIVE
   rfid_set_register_bitmask(0x0D, 0x80); // self.SetBitMask(self.BitFramingReg, 0x80)
 
+  do {
+    quicksleep(100);
+    n = rfid_read_register(0x04);
+    i--;
+  } while ((i!=0) && !(n&0x01) && !(n&waitIRq));
+
+  display_string(0, char_to_hexstring(n));
+
   uint8_t error = rfid_read_register(0x06); // if (self.Read_MFRC522(self.ErrorReg) & 0x1B)==0x00:
   if (!(error & 0x1B)) {
     display_string(3, "MI_OK");
@@ -213,10 +245,11 @@ void labwork( void )
       display_string(3, "MI_NOTAGERR");
     } else {
       n = rfid_read_register(0x0A);
-      uint8_t lastBits = rfid_read_register(0x0C) & 0x07;
+      //uint8_t lastBits = rfid_read_register(0x0C) & 0x07;
+      //display_string(0, char_to_hexstring(n));
 
-      uint8_t* buffer = rfid_read_fifo();
-      display_string(0, char_to_hexstring(buffer[1]));
+      //uint8_t* buffer = rfid_read_fifo();
+      //display_string(0, char_to_hexstring(buffer[1]));
 
       //display_string(0, char_to_hexstring(lastBits));
     }

@@ -160,48 +160,71 @@ void labwork( void )
   display_string(3, char_to_hexstring(received));
   */
 
+  //display_string(0, itoaconv(counter));
+
+  uint8_t waitIRq = 0x77;
+  uint8_t irqEn = 0x77;
+
   rfid_write_register(0x0D, 0x07); // self.Write_MFRC522(self.BitFramingReg, 0x07)
 
-  rfid_write_register(0x04, 0x77 | 0x80);   // self.Write_MFRC522(self.CommIEnReg, irqEn|0x80)
+  rfid_write_register(0x02, irqEn | 0x80);   // self.Write_MFRC522(self.CommIEnReg, irqEn|0x80)
   rfid_clear_register_bitmask(0x04, 0x80);  // self.ClearBitMask(self.CommIrqReg, 0x80)
   rfid_set_register_bitmask(0x0A, 0x80);    // self.SetBitMask(self.FIFOLevelReg, 0x80)
 
-  display_string(0, rfid_read_register(0x04));
-
   rfid_write_register(0x01, 0x00); // self.Write_MFRC522(self.CommandReg, self.PCD_IDLE);
-
   rfid_write_register(0x09, 0x26); // self.Write_MFRC522(self.FIFODataReg, sendData[i]) --> PICC_REQIDL
-
   rfid_write_register(0x01, 0x0C); // self.Write_MFRC522(self.CommandReg, command) --> PCD_TRANSCEIVE
-
   rfid_set_register_bitmask(0x0D, 0x80); // self.SetBitMask(self.BitFramingReg, 0x80)
 
-  // Rad 176 - 180??
-
-  int i = 2000;
+  int i = 25;
   uint8_t n;
-  while (1) {
 
+  do {
+    quicksleep(100);
     n = rfid_read_register(0x04);
-    i = i - 1;
-    if (~((i != 0) && ~(n & 0x01) && ~(n & 0x00))) {
-      break;
-    }
-  }
+    i--;
+  } while ((i!=0) && !(n&0x01) && !(n&waitIRq));
 
   display_string(1, itoaconv(i));
   display_string(2, char_to_hexstring(n));
 
   rfid_clear_register_bitmask(0x0D, 0x80);
 
+  // Starting anticoll
+  rfid_write_register(0x0D, 0x00); // self.Write_MFRC522(self.BitFramingReg, 0x00)
+
+  rfid_write_register(0x02, irqEn | 0x80);  // self.Write_MFRC522(self.CommIEnReg, irqEn|0x80)
+  rfid_clear_register_bitmask(0x04, 0x80);  // self.ClearBitMask(self.CommIrqReg, 0x80)
+  rfid_set_register_bitmask(0x0A, 0x80);    // self.SetBitMask(self.FIFOLevelReg, 0x80)
+  rfid_write_register(0x01, 0x00); // self.Write_MFRC522(self.CommandReg, self.PCD_IDLE);
+
+  // self.Write_MFRC522(self.FIFODataReg, sendData[i])
+  rfid_write_register(0x09, 0x93); // serNum.append(self.PICC_ANTICOLL)
+  rfid_write_register(0x09, 0x20); // serNum.append(0x20)
+
+  rfid_write_register(0x01, 0x0C); // self.Write_MFRC522(self.CommandReg, command) --> PCD_TRANSCEIVE
+  rfid_set_register_bitmask(0x0D, 0x80); // self.SetBitMask(self.BitFramingReg, 0x80)
+
   uint8_t error = rfid_read_register(0x06); // if (self.Read_MFRC522(self.ErrorReg) & 0x1B)==0x00:
-  if ((error & 0x1B) == 0x00) {
+  if (!(error & 0x1B)) {
     display_string(3, "MI_OK");
 
-    if (n & 0x12 & 0x01) {
+    if (n & irqEn & 0x01) {
       display_string(3, "MI_NOTAGERR");
+    } else {
+      n = rfid_read_register(0x0A);
+      uint8_t lastBits = rfid_read_register(0x0C) & 0x07;
+
+      uint8_t* buffer = rfid_read_fifo();
+      display_string(0, char_to_hexstring(buffer[1]));
+
+      //display_string(0, char_to_hexstring(lastBits));
     }
+  } else {
+    display_string(2, "MI_ERR");
   }
+
+
 
 
   //rfid_read_fifo(fifo_buffer);

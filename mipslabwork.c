@@ -14,12 +14,12 @@
 #include <pic32mx.h>  /* Declarations of system-specific addresses etc */
 #include "mipslab.h"  /* Declatations for these labs */
 #include "rfid.h" /* Declarations for RFID */
+#include "servo.h" /* Declarations for servo motor */
 
 const CLOCKWISE = 0x3000;
 const COUNTER_CLOCKWISE = 0x500;
 
 int servo_clockwise = 1;
-int mytime = 0x5957;
 int counter = 0;
 int timerCounter = 0;
 int rfid_clock = 1;
@@ -65,11 +65,7 @@ void labinit( void )
   TMR2 = 0;           // Nollställ klockan
   PR2 = 25000;        // Räkna upp till X
 
-  OC1CON = 0x00000000; // Nollställ oc1
-  OC1CON = 0x00000006; // Sätt PWM mode on (bit 0-2), 32-bit Compare Mode bit till 0 (16 bits klocka)
-
-  OC1R = CLOCKWISE;
-  OC1RS = CLOCKWISE + 3;
+  servo_init();
 
   T2CONSET = 1 << 15; // Starta klockan
 
@@ -92,8 +88,7 @@ void labwork( void )
 
   if (button4 && !button4_pushed) {
 
-    OC1R = CLOCKWISE;
-    OC1RS = CLOCKWISE + 3;
+    servo_set_clockwise();
     button4_pushed = 1;
   } else if (!button4 && button4_pushed) {
     button4_pushed = 0;
@@ -102,8 +97,7 @@ void labwork( void )
   int button2 = buttons & 1;
   if (button2 && !button2_pushed) {
 
-    OC1R = COUNTER_CLOCKWISE;
-    OC1RS = COUNTER_CLOCKWISE + 3;
+    servo_set_counter_clockwise();
     button2_pushed = 1;
   } else if (!button2 && button2_pushed) {
     button2_pushed = 0;
@@ -111,17 +105,15 @@ void labwork( void )
 
   if (buttons && !buttons_pushed) {
 
-    OC1CON = (OC1CON & 0xffff7fff) | 1 << 15;
+    servo_start_rotation();
     //display_string( 3, "on");
     buttons_pushed = 1;
   } else if (!buttons && buttons_pushed) {
 
-    OC1CON &= 0xffff7fff;
+    servo_stop_rotation();
     //display_string( 3, "off");
     buttons_pushed = 0;
   }
-
-  /* Timer */
 
   // Om timeout flaggan är 1, räkna upp timerCounter och nollställ timeoutflaggan.
   if (IFS(0) & 0x100) {

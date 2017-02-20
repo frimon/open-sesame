@@ -8,19 +8,43 @@ void rfid_init() {
   TRISECLR = 1 << 7; // Sätter Slaveselect-porten som output
   PORTESET = 1 << 7; // Slaveselect (inte används)
 
+  rfid_write_register(0x01, 0x0f); // Reset
+
+  rfid_write_register(0x2A,0x8D);  // TModeReg
+  rfid_write_register(0x2B,0x3E);  // TPrescalerReg
+  rfid_write_register(0x2D, 30);   // TReloadRegL
+  rfid_write_register(0x2C, 0);    // TReloadRegH
+  rfid_write_register(0x15, 0x40); // TxAutoReg
+  rfid_write_register(0x11, 0x3D); // ModeReg
+
+  /* ANTENNA ON */
+  uint8_t ant_value = rfid_read_register(0x14); // TxControlReg
+  if (~(ant_value & 0x03)) {
+    rfid_set_register_bitmask(0x14, 0x03);
+  }
+  /* OLD IMPLEMENTATION
+  if ((ant_value & 0x03) != 0x03) {
+    rfid_write_register(0x14, ant_value | 0x03);
+  }
+  */
+
   /* TIMEOUT */
+  /*
   rfid_write_register(0x2A,0x80); // TMODEREG
   rfid_write_register(0x2B,0xA9); // TPRESCALERREG
   rfid_write_register(0x2C,0x03); // TRELOADREGH
   rfid_write_register(0x2D,0xE8); // TRELOADREGL
   rfid_write_register(0x15,0x40); // TXASKREG
   rfid_write_register(0x11,0x3D); // MODEREG
+  */
 
   /* ANTENNA */
+  /*
   uint8_t ant_value = rfid_read_register(0x14); // TXCONTROLREG
   if ((ant_value & 0x03) != 0x03) {
     rfid_write_register(0x14, ant_value | 0x03);
   }
+  */
 
   /* CARD PRESENT CHECK */
 
@@ -70,4 +94,16 @@ uint8_t* rfid_read_fifo(char fifo_buffer[]) {
 
   PORTESET = 1 << 7; // Sätter att RFID-kortet inte längre är slave
   PORTFCLR = 0x10; // DISPLAY_CHANGE_TO_COMMAND_MODE
+}
+
+void rfid_set_register_bitmask(uint8_t reg, uint8_t mask) {
+
+  uint8_t tmp = rfid_read_register(reg);
+  rfid_write_register(reg, tmp | mask);
+}
+
+void rfid_clear_register_bitmask(uint8_t reg, uint8_t mask) {
+
+  uint8_t tmp = rfid_read_register(reg);
+  rfid_write_register(reg, tmp & (~mask));
 }

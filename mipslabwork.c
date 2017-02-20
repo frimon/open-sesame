@@ -71,6 +71,8 @@ void labinit( void )
 
   T2CONSET = 1 << 15; // Starta klockan
 
+  /*
+  AUTO TEST
   rfid_write_register(0x01, 0x0f); // Soft reset
   int i;
   for (i = 0; i < 25; i++) {
@@ -82,6 +84,7 @@ void labinit( void )
   rfid_write_register(0x01, 0x03); // Start self test with CalcCRC command
 
   rfid_read_fifo(&fifo_buffer);
+  */
 
   return;
 }
@@ -157,12 +160,61 @@ void labwork( void )
   display_string(3, char_to_hexstring(received));
   */
 
-  display_string(1, char_to_hexstring(counter));
-  display_string(3, char_to_hexstring(fifo_buffer[counter]));
+  rfid_write_register(0x0D, 0x07); // self.Write_MFRC522(self.BitFramingReg, 0x07)
+
+  rfid_write_register(0x04, 0x77 | 0x80);   // self.Write_MFRC522(self.CommIEnReg, irqEn|0x80)
+  rfid_clear_register_bitmask(0x04, 0x80);  // self.ClearBitMask(self.CommIrqReg, 0x80)
+  rfid_set_register_bitmask(0x0A, 0x80);    // self.SetBitMask(self.FIFOLevelReg, 0x80)
+
+  display_string(0, rfid_read_register(0x04));
+
+  rfid_write_register(0x01, 0x00); // self.Write_MFRC522(self.CommandReg, self.PCD_IDLE);
+
+  rfid_write_register(0x09, 0x26); // self.Write_MFRC522(self.FIFODataReg, sendData[i]) --> PICC_REQIDL
+
+  rfid_write_register(0x01, 0x0C); // self.Write_MFRC522(self.CommandReg, command) --> PCD_TRANSCEIVE
+
+  rfid_set_register_bitmask(0x0D, 0x80); // self.SetBitMask(self.BitFramingReg, 0x80)
+
+  // Rad 176 - 180??
+
+  int i = 2000;
+  uint8_t n;
+  while (1) {
+
+    n = rfid_read_register(0x04);
+    i = i - 1;
+    if (~((i != 0) && ~(n & 0x01) && ~(n & 0x00))) {
+      break;
+    }
+  }
+
+  display_string(1, itoaconv(i));
+  display_string(2, char_to_hexstring(n));
+
+  rfid_clear_register_bitmask(0x0D, 0x80);
+
+  uint8_t error = rfid_read_register(0x06); // if (self.Read_MFRC522(self.ErrorReg) & 0x1B)==0x00:
+  if ((error & 0x1B) == 0x00) {
+    display_string(3, "MI_OK");
+
+    if (n & 0x12 & 0x01) {
+      display_string(3, "MI_NOTAGERR");
+    }
+  }
+
+
+  //rfid_read_fifo(fifo_buffer);
+
+  //display_string(1, char_to_hexstring(counter));
+  //display_string(3, char_to_hexstring(fifo_buffer[counter]));
   counter++;
 
-  //uint8_t received = rfid_read_register(0x37);
-  //display_string(3, char_to_hexstring(received));
+  /* VERSION */
+  /*
+  uint8_t received = rfid_read_register(0x37);
+  display_string(3, char_to_hexstring(received));
+  */
 
   /* Motor (Kanske behövs) */
 

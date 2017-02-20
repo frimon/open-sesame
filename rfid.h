@@ -12,3 +12,5 @@ uint8_t rfid_send_data(uint8_t reg, uint8_t value);
 void rfid_write_register(uint8_t reg, uint8_t value);
 uint8_t rfid_read_register(uint8_t reg);
 uint8_t* rfid_read_fifo();
+void rfid_set_register_bitmask(uint8_t reg, uint8_t mask);
+void rfid_clear_register_bitmask(uint8_t reg, uint8_t mask);

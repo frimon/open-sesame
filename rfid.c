@@ -107,3 +107,171 @@ void rfid_clear_register_bitmask(uint8_t reg, uint8_t mask) {
   uint8_t tmp = rfid_read_register(reg);
   rfid_write_register(reg, tmp & (~mask));
 }
+
+int rfid_command_tag(uint8_t cmd, uint8_t data[], int dlen, uint8_t *result, int *rlen) {
+
+  int status = MI_ERR;
+  uint8_t irqEn = 0x00;
+  uint8_t waitIRq = 0x00;
+  uint8_t lastBits, n;
+  int i;
+
+  switch (cmd) {
+    case MFRC522_AUTHENT:
+      irqEn = 0x12;
+      waitIRq = 0x10;
+      break;
+    case MFRC522_TRANSCEIVE:
+      irqEn = 0x77;
+      waitIRq = 0x30;
+      break;
+    default:
+      break;
+  }
+
+  rfid_write_register(CommIEnReg, irqEn|0x80);
+  rfid_clear_register_bitmask(CommIrqReg, 0x80);
+  rfid_set_register_bitmask(FIFOLevelReg, 0x80);
+
+  rfid_write_register(CommandReg, MFRC522_IDLE);  // No action, cancel the current command.
+
+  // Write to FIFO
+  for (i=0; i < dlen; i++) {
+    rfid_write_register(FIFODataReg, data[i]);
+  }
+
+  // Execute the command.
+  rfid_write_register(CommandReg, cmd);
+  if (cmd == MFRC522_TRANSCEIVE) {
+    rfid_set_register_bitmask(BitFramingReg, 0x80);  // StartSend=1, transmission of data starts
+  }
+
+  // Waiting for the command to complete so we can receive data.
+  i = 100; // Max wait time is 25ms.
+  do {
+    quicksleep(100);
+    // CommIRqReg[7..0]
+    // Set1 TxIRq RxIRq IdleIRq HiAlerIRq LoAlertIRq ErrIRq TimerIRq
+    n = rfid_read_register(CommIrqReg);
+    i--;
+  } while ((i!=0) && !(n&0x01) && !(n&waitIRq));
+
+  rfid_clear_register_bitmask(BitFramingReg, 0x80);  // StartSend=0
+
+  if (i != 0) { // Request did not time out.
+    if(!(rfid_read_register(ErrorReg) & 0x1D)) {  // BufferOvfl Collerr CRCErr ProtocolErr
+      status = MI_OK;
+      if (n & irqEn & 0x01) {
+        status = MI_NOTAGERR;
+      }
+
+      if (cmd == MFRC522_TRANSCEIVE) {
+        n = rfid_read_register(FIFOLevelReg);
+        lastBits = rfid_read_register(ControlReg) & 0x07;
+        if (lastBits) {
+          *rlen = (n-1)*8 + lastBits;
+        } else {
+          *rlen = n*8;
+        }
+
+        if (n == 0) {
+          n = 1;
+        }
+
+        if (n > MAX_LEN) {
+          n = MAX_LEN;
+        }
+
+        // Reading the recieved data from FIFO.
+        for (i=0; i<n; i++) {
+          result[i] = rfid_read_register(FIFODataReg);
+        }
+      }
+    } else {
+      status = MI_ERR;
+    }
+  }
+
+  return status;
+}
+
+int rfid_request_tag(uint8_t mode, uint8_t* data) {
+
+  int status, len;
+  rfid_write_register(BitFramingReg, 0x07);  // TxLastBists = BitFramingReg[2..0]
+
+  data[0] = mode;
+  status = rfid_command_tag(MFRC522_TRANSCEIVE, data, 1, data, &len);
+
+  if ((status != MI_OK) || (len != 0x10)) {
+    status = MI_ERR;
+  }
+
+  return status;
+}
+
+int rfid_anti_collision(uint8_t* serial) {
+
+  int status, i, len;
+  uint8_t check = 0x00;
+
+  rfid_write_register(BitFramingReg, 0x00);  // TxLastBits = BitFramingReg[2..0]
+
+  serial[0] = MF1_ANTICOLL;
+  serial[1] = 0x20;
+  status = rfid_command_tag(MFRC522_TRANSCEIVE, serial, 2, serial, &len);
+  len = len / 8; // len is in bits, and we want each byte.
+  if (status == MI_OK) {
+    // The checksum of the tag is the ^ of all the values.
+    for (i = 0; i < len-1; i++) {
+      check ^= serial[i];
+    }
+    // The checksum should be the same as the one provided from the
+    // tag (serial[4]).
+    if (check != serial[i]) {
+      status = MI_ERR;
+    }
+  }
+
+  return status;
+}
+
+int rfid_validate_card(uint8_t cards[][4]) {
+
+  uint8_t data[MAX_LEN];
+  uint8_t serial[5];
+
+  int status = rfid_request_tag(MF1_REQIDL, data);
+  if (status != MI_OK) {
+    return 0;
+  }
+
+  status = rfid_anti_collision(serial);
+
+  /*
+  display_string(0, char_to_hexstring(cards[1][0]));
+  display_string(1, char_to_hexstring(cards[1][1]));
+  display_string(2, char_to_hexstring(cards[1][2]));
+  display_string(3, char_to_hexstring(cards[1][3]));
+  */
+
+  display_string(0, char_to_hexstring(serial[0]));
+  display_string(1, char_to_hexstring(serial[1]));
+  display_string(2, char_to_hexstring(serial[2]));
+  display_string(3, char_to_hexstring(serial[3]));
+
+  int i;
+  for (i = 0; i < sizeof(cards) / sizeof(uint8_t) / 4; i++) {
+
+    if (
+    serial[0] == cards[i][0] &&
+    serial[1] == cards[i][1] &&
+    serial[2] == cards[i][2] &&
+    serial[3] == cards[i][3]) {
+
+      return 1;
+    }
+  }
+
+  return 0;
+}

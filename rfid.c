@@ -3,10 +3,10 @@
 #include <stdint.h>   /* Declarations of uint_32 and the like */
 
 void rfid_init() {
-  TRISGCLR = 5 << 6; // Sätter SCK1 och MOSI som outputs
-  TRISGSET = 1 << 7; // Sätter MISO som input
-  TRISECLR = 1 << 7; // Sätter Slaveselect-porten som output
-  PORTESET = 1 << 7; // Slaveselect (inte används)
+  TRISGCLR = 5 << 6; // Sets SCK1 and MOSI as outputs
+  TRISGSET = 1 << 7; // Sets MISO as input
+  TRISECLR = 1 << 7; // Sets Slaveselect port as output
+  PORTESET = 1 << 7; // Slaveselect (not used)
 
   rfid_write_register(0x01, 0x0f); // Reset
 
@@ -22,62 +22,33 @@ void rfid_init() {
   if (~(ant_value & 0x03)) {
     rfid_set_register_bitmask(0x14, 0x03);
   }
-  /* OLD IMPLEMENTATION
-  if ((ant_value & 0x03) != 0x03) {
-    rfid_write_register(0x14, ant_value | 0x03);
-  }
-  */
-
-  /* TIMEOUT */
-  /*
-  rfid_write_register(0x2A,0x80); // TMODEREG
-  rfid_write_register(0x2B,0xA9); // TPRESCALERREG
-  rfid_write_register(0x2C,0x03); // TRELOADREGH
-  rfid_write_register(0x2D,0xE8); // TRELOADREGL
-  rfid_write_register(0x15,0x40); // TXASKREG
-  rfid_write_register(0x11,0x3D); // MODEREG
-  */
-
-  /* ANTENNA */
-  /*
-  uint8_t ant_value = rfid_read_register(0x14); // TXCONTROLREG
-  if ((ant_value & 0x03) != 0x03) {
-    rfid_write_register(0x14, ant_value | 0x03);
-  }
-  */
-
-  /* CARD PRESENT CHECK */
 
 }
 uint8_t rfid_send_data(uint8_t reg, uint8_t value){
   PORTFSET = 0x10; // DISPLAY_CHANGE_TO_DATA_MODE
-  PORTECLR = 1 << 7; // Sätter till att RFID-kortet ska agera som slave
+  PORTECLR = 1 << 7; // Sets so that RFID-reader should act as slave.
   spi_send_recv(reg);
   uint8_t received = spi_send_recv(value);
-  PORTESET = 1 << 7; // Sätter att RFID-kortet inte längre är slave
+  PORTESET = 1 << 7; // Sets so that RFID-reader is no longer slave.
   PORTFCLR = 0x10; // DISPLAY_CHANGE_TO_COMMAND_MODE
   return received;
 }
 void rfid_write_register(uint8_t reg, uint8_t value) {
-  rfid_send_data((reg << 1) & 0x7E, value);
+  rfid_send_data((reg << 1) & 0x7E, value); // First bit set to 0 for write
 }
 uint8_t rfid_read_register(uint8_t reg) {
-  return rfid_send_data(0x80 | ((reg << 1) & 0x7E), 0);
+  return rfid_send_data(0x80 | ((reg << 1) & 0x7E), 0); // First bit set to 1 for write
 }
 
 uint8_t* rfid_read_fifo(char fifo_buffer[]) {
 
   PORTFSET = 0x10; // DISPLAY_CHANGE_TO_DATA_MODE
-  PORTECLR = 1 << 7; // Sätter till att RFID-kortet ska agera som slave
+  PORTECLR = 1 << 7; // // Sets so that RFID-reader should act as slave.
 
-  //uint8_t count = rfid_read_register(0x0A) & 0x7F;
   uint8_t count = 64;
 
   int i;
-  //char buffer[count];
   spi_send_recv(0x80 | ((0x09 << 1) & 0x7E));
-
-  //quicksleep(99999);
 
   for (i = 0; i < count; i++) {
 
@@ -88,11 +59,9 @@ uint8_t* rfid_read_fifo(char fifo_buffer[]) {
     } else {
       fifo_buffer[i] = spi_send_recv(0x80 | ((0x09 << 1) & 0x7E));
     }
-
-    //spi_send_recv(0); // null byte
   }
 
-  PORTESET = 1 << 7; // Sätter att RFID-kortet inte längre är slave
+  PORTESET = 1 << 7; // Sets so that RFID-reader is no longer slave.
   PORTFCLR = 0x10; // DISPLAY_CHANGE_TO_COMMAND_MODE
 }
 
@@ -118,11 +87,11 @@ int rfid_command_tag(uint8_t cmd, uint8_t data[], int dlen, uint8_t *result, int
 
   switch (cmd) {
     case MFRC522_AUTHENT:
-      irqEn = 0x12;
+      irqEn = 0x12; //IdleIEn, ErrIEn
       waitIRq = 0x10;
       break;
     case MFRC522_TRANSCEIVE:
-      irqEn = 0x77;
+      irqEn = 0x77; // TxIEn, RxIEn, IdleIEn, LoAlertIEn, ErrIEn, TimerIEn
       waitIRq = 0x30;
       break;
     default:
@@ -249,7 +218,7 @@ int rfid_validate_card(uint8_t cards[][5], int no_of_cards) {
   status = rfid_anti_collision(serial);
 
   int i;
-  for (i = 0; i < no_of_cards; i++) {
+  for (i = 0; i < no_of_cards; i++) { // Match serial against cards that are set as keys
 
     if (
     serial[0] == cards[i][0] &&

@@ -3,11 +3,11 @@
 #include <stdint.h>   /* Declarations of uint_32 and the like */
 
 /*
-INPUT VOLTAGE = 3V
+INPUT VOLTAGE = 5V
 OC1           = PIN 3  PORT D0
 */
 int servo_time_counter;
-uint8_t servo_open;
+uint8_t servo_open = 1;
 
 void servo_init() {
 
@@ -16,26 +16,29 @@ void servo_init() {
   servo_set_direction(SERVO_CLOCKWISE);
 }
 
-void servo_rotate_time(int direction, int time_in_ms) {
-  servo_set_direction(direction);
-  servo_start_rotation();
-  servo_start_timer(time_in_ms);
+void servo_rotate_time(int direction, int time) {
+
+  if (!((T2CON >> 15) & 1)) {
+
+    servo_set_direction(direction);
+    servo_start_rotation();
+    servo_start_timer(time);
+  }
 }
 
-void servo_start_timer(int time_in_ms){
-  if(T2CON & (1 << 15)) {
-    servo_time_counter = time_in_ms; // Set timer length
+void servo_start_timer(int time) {
 
-    T2CON = 6 << 4;     // 1:64 scaling
-    TMR2 = 0;           // Nollställ klockan
-    PR2 = 1250;        // Räkna upp till 31 250
+  servo_time_counter = time; // Set timer length
 
-    enable_interrupt();
-    IECSET(0) = 0x00000100; // Sätt index 8 till en etta (motsvarar timer 2)
-    IPCSET(2) = 0x00000004; // Sätt prio till 4
+  T2CON = 5 << 4;     // 1:64 scaling
+  TMR2 = 0;           // Nollställ klockan
+  PR2 = 25000;        // Räkna upp till 31 250
 
-    T2CONSET = 1 << 15; // Starta klockan
-  }
+  enable_interrupt();
+  IECSET(0) = 0x00000100; // Sätt index 8 till en etta (motsvarar timer 2)
+  IPCSET(2) = 0x00000004; // Sätt prio till 4
+
+  T2CONSET = 1 << 15; // Starta klockan
 }
 
 void servo_stop_timer(){
@@ -43,19 +46,29 @@ void servo_stop_timer(){
 }
 
 void servo_interrupt(){
+
   servo_time_counter--;
   IFSCLR(0) = 1 << 8;
+
   if (servo_time_counter == 0) {
+
     servo_stop_timer();
     servo_stop_rotation();
   }
 }
 
 void servo_toggle(){
-  if (servo_open) {
-    servo_rotate_time(SERVO_CLOCKWISE, 1000);
-  } else {
-    servo_rotate_time(SERVO_COUNTER_CLOCKWISE, 1000);
+
+  if (!((T2CON >> 15) & 1)) {
+    if (servo_open) {
+
+      servo_rotate_time(SERVO_CLOCKWISE, 120);
+      servo_open = 0;
+    } else {
+
+      servo_rotate_time(SERVO_COUNTER_CLOCKWISE, 120);
+      servo_open = 1;
+    }
   }
 }
 

@@ -4,8 +4,8 @@
 void servo_init();
 void servo_start_rotation();
 void servo_stop_rotation();
-void servo_rotate_time(int direction, int time_in_ms);
-void servo_start_timer(int time_in_ms);
+void servo_rotate_time(int direction, int time);
+void servo_start_timer(int time);
 void servo_set_direction(int direction);
 void servo_stop_timer();
 void servo_interrupt();

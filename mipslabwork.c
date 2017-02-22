@@ -13,6 +13,9 @@ uint8_t cards[2][5] = {
   { 0x83, 0x9e, 0x18, 0x32, 0x37 }  // Simons SL-kort
 };
 
+const CLOCKWISE = 0x3000;
+const COUNTER_CLOCKWISE = 0x500;
+
 int counter = 0;
 int timerCounter = 0;
 
@@ -45,8 +48,8 @@ void labinit( void ) {
   rfid_init();
   servo_init();
 
-  TRISECLR = 1; // LED på pin 26 till output
-  PORTECLR = 1;
+  //TRISECLR = 1; // LED på pin 26 till output
+  //PORTECLR = 1;
 
   return;
 }
@@ -54,28 +57,12 @@ void labinit( void ) {
 /* This function is called repetitively from the main program */
 void labwork( void )
 {
-  /*
-  // Om timeout flaggan är 1, räkna upp timerCounter och nollställ timeoutflaggan.
-  if (IFS(0) & 0x100) {
 
-    timerCounter++;
-    IFS(0) = 0;
-  }
-
-  // Om vår egna räknare är mindre än 10, ignorera koden nedan.
-  if (timerCounter < 100) {
-    return;
-  }
-  */
   int no_of_cards = sizeof(cards) / sizeof(cards[0]);
   int status = rfid_validate_card(cards, no_of_cards);
   if (status) {
-    PORTESET = 1;
     servo_toggle();
   }
-
-  counter++;
-  timerCounter = 0;
 
   display_update();
 }

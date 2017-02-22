@@ -13,26 +13,38 @@
 #include <stdint.h>   /* Declarations of uint_32 and the like */
 #include <pic32mx.h>  /* Declarations of system-specific addresses etc */
 #include "mipslab.h"  /* Declatations for these labs */
+#include "rfid.h" /* Declarations for RFID */
 
 const CLOCKWISE = 0x3000;
 const COUNTER_CLOCKWISE = 0x500;
+
+uint8_t cards[][4] = {
+  { 0x06, 0xf3, 0x25, 0xa0 }, // Vitt RFID-kort
+  { 0x83, 0x9e, 0x18, 0x32 } // Simons SL-kort
+};
 
 int servo_clockwise = 1;
 int mytime = 0x5957;
 int counter = 0;
 int timerCounter = 0;
 int rfid_clock = 1;
-unsigned char in_digits = 0;
+char fifo_buffer[64];
 
-// 30, 31, 32, 33
-// 30 = PORTE[4] = SCLK (klocka - utgång)
-// 31 = PORTE[5] = MOSI (master out - utgång)
-// 32 = PORTE[6] = MISO (master in - ingång)
-// 33 = PORTE[7] = SS (aktiv låg - utgång)
+/* Char to hexstring */
+char* char_to_hexstring (uint8_t data) {
 
-//volatile int *rfid_address = (volatile int*) 0x28;
+  unsigned char digit1 = data >> 4;
+  unsigned char digit2 = data & 0x0f;
 
-char textstring[] = "text, more text, and even more text!";
+  digit1 += digit1 <= 9 ? 0x30 : 0x37; // Convert to Ascii
+  digit2 += digit2 <= 9 ? 0x30 : 0x37;
+
+  char out[] = {
+    '0', 'x', digit1, digit2, 0
+  };
+
+  return out;
+}
 
 /* Interrupt Service Routine */
 void user_isr( void )
@@ -40,13 +52,15 @@ void user_isr( void )
   return;
 }
 
+
+
 /* Lab-specific initialization goes here */
 void labinit( void )
 {
 
-  // 80000000/256/31250
+  // 80000000/256/31250 = 10
 
-  TRISD |= (0x7f << 5); // 5 through 11 to ones
+  rfid_init();
 
   T2CON = 5 << 4;     // 1:32 scaling
   TMR2 = 0;           // Nollställ klockan
@@ -58,15 +72,14 @@ void labinit( void )
   OC1R = CLOCKWISE;
   OC1RS = CLOCKWISE + 3;
 
-  TRISESET = 1 << 6;
-  TRISECLR = 0x0B << 4;
-  //TRISE = (TRISE & 0xffffff0f) | (1 << 6);
-  PORTECLR = 1 << 7; // Skicka noll till slave select
+  TRISECLR = 1; // LED på pin 26 till output
+  PORTECLR = 1;
 
   T2CONSET = 1 << 15; // Starta klockan
-
   return;
 }
+
+/* Motor */
 
 int buttons_pushed = 0;
 int button2_pushed = 0;
@@ -76,7 +89,7 @@ int button4_pushed = 0;
 /* This function is called repetitively from the main program */
 void labwork( void )
 {
-
+  /* Motor */
   int buttons = getbtns();
   int button4 = (buttons >> 2) & 1;
 
@@ -111,39 +124,7 @@ void labwork( void )
     buttons_pushed = 0;
   }
 
-/*
-  if (*rfid_address == 0) {
-    display_string(3, "equals zero");
-  } else {
-    display_string(3, "not zero");
-  }
-  */
-
-
-  /*
-  if (button4 == 1) {
-    OC1CON = (OC1CON & 0xffff7fff) | 1 << 15;
-    display_string( 3, "on");
-  } else {
-    OC1CON &= 0xffff7fff;
-    display_string( 3, "off");
-  }
-  */
-
-/*
-    int button4 = buttons & (1 << 2);
-
-    // Är knapp 4 intryckt?
-    if (button4) {
-      OC1CON = (OC1CON & 0xffff7fff) | 1 << 15;
-
-      display_string( 3, "on");
-    } else {
-      OC1CON &= 0xffff7fff;
-      display_string( 3, "off");
-    }
-  }
-  */
+  /* Timer */
 
   // Om timeout flaggan är 1, räkna upp timerCounter och nollställ timeoutflaggan.
   if (IFS(0) & 0x100) {
@@ -153,103 +134,27 @@ void labwork( void )
   }
 
   // Om vår egna räknare är mindre än 10, ignorera koden nedan.
-  if (timerCounter < 20) {
+  if (timerCounter < 100) {
     return;
   }
 
-  rfid_clock = !rfid_clock;
-
-  if (rfid_clock) {
-
-    // if raising edge
-    PORTESET = 1 << 4;
-
-    int rfid_in = (PORTE >> 6) & 1;
-    if (rfid_in) {
-      display_string( 3, "IN: 1");
-    } else {
-      display_string( 3, "IN: 0");
-    }
-
-    int shift = 8 - counter;
-    if (counter > 8) {
-      shift = 16 - counter;
-    }
-
-    in_digits |= rfid_in << shift;
-
-    display_string( 0, itoaconv( counter - 1 ) );
-    //display_string( 1, itoaconv( shift ) );
-    //display_string( 1, itoaconv( in_digits ) );
-
-    unsigned char digit1 = in_digits >> 4;
-    unsigned char digit2 = in_digits & 0x0f;
-
-    switch ((counter - 1)) {
-      case 7:
-      case 15:
-
-        digit1 += digit1 <= 9 ? 0x30 : 0x37;
-        digit2 += digit2 <= 9 ? 0x30 : 0x37;
-
-        char out[] = {
-          '0',
-          'x',
-          digit1,
-          digit2,
-          0x00
-        };
-
-
-        display_string(2, out);
-
-        break;
-    }
-
-    if (counter - 1 == 15) {
-      counter = 0;
-    }
-
+  int status = rfid_validate_card(cards);
+  if (status) {
+    PORTESET = 1;
+    //display_string(0, "OK");
   } else {
-
-    // if falling edge
-    PORTECLR = 1 << 4;
-
-    if (counter == 0 || counter == 7) {
-      in_digits = 0;
-    }
-
-    switch (counter) {
-
-      // E
-      case 0: PORTESET = 1 << 5; break;
-      case 1: PORTESET = 1 << 5; break;
-      case 2: PORTESET = 1 << 5; break;
-      case 3: PORTECLR = 1 << 5; break;
-
-      // E
-      case 4: PORTESET = 1 << 5; break;
-      case 5: PORTESET = 1 << 5; break;
-      case 6: PORTESET = 1 << 5; break;
-      case 7: PORTECLR = 1 << 5; break;
-
-      // Send 0x00
-      case 8:  PORTECLR = 1 << 5; break;
-      case 9:  PORTECLR = 1 << 5; break;
-      case 10: PORTECLR = 1 << 5; break;
-      case 11: PORTECLR = 1 << 5; break;
-      case 12: PORTECLR = 1 << 5; break;
-      case 13: PORTECLR = 1 << 5; break;
-      case 14: PORTECLR = 1 << 5; break;
-      case 15:
-        PORTECLR = 1 << 5;
-      break;
-    }
-
-    counter++;
-
-    //display_string( 3, "falling edge");
+    //display_string(0, "NOT OK");
   }
+
+  counter++;
+
+  /* VERSION */
+  /*
+  uint8_t received = rfid_read_register(0x37);
+  display_string(3, char_to_hexstring(received));
+  */
+
+  /* Motor (Kanske behövs) */
 
   /*
   if (counter < 20) {
@@ -280,13 +185,7 @@ void labwork( void )
   // Om räknaren har räknat upp till 10, nollställ och räkna sen upp klocka etc.
   timerCounter = 0;
 
-  //PORTD = 0xffffffff;
-
-  //delay( 1000 );
-  //time2string( textstring, mytime );
-  //display_string( 3, textstring );
-
   display_update();
-  tick( &mytime );
-  display_image(96, icon);
+  //tick( &mytime );
+  //display_image(96, icon);
 }

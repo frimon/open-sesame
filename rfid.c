@@ -236,7 +236,7 @@ int rfid_anti_collision(uint8_t* serial) {
   return status;
 }
 
-int rfid_validate_card(uint8_t cards[][4]) {
+int rfid_validate_card(uint8_t cards[][5], int no_of_cards) {
 
   uint8_t data[MAX_LEN];
   uint8_t serial[5];
@@ -248,26 +248,15 @@ int rfid_validate_card(uint8_t cards[][4]) {
 
   status = rfid_anti_collision(serial);
 
-  /*
-  display_string(0, char_to_hexstring(cards[1][0]));
-  display_string(1, char_to_hexstring(cards[1][1]));
-  display_string(2, char_to_hexstring(cards[1][2]));
-  display_string(3, char_to_hexstring(cards[1][3]));
-  */
-
-  display_string(0, char_to_hexstring(serial[0]));
-  display_string(1, char_to_hexstring(serial[1]));
-  display_string(2, char_to_hexstring(serial[2]));
-  display_string(3, char_to_hexstring(serial[3]));
-
   int i;
-  for (i = 0; i < sizeof(cards) / sizeof(uint8_t) / 4; i++) {
+  for (i = 0; i < no_of_cards; i++) {
 
     if (
     serial[0] == cards[i][0] &&
     serial[1] == cards[i][1] &&
     serial[2] == cards[i][2] &&
-    serial[3] == cards[i][3]) {
+    serial[3] == cards[i][3] &&
+    serial[4] == cards[i][4]) {
 
       return 1;
     }

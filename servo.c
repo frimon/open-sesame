@@ -7,24 +7,21 @@ INPUT VOLTAGE = 3V
 OC1           = PIN 3  PORT D0
 */
 
-const CLOCKWISE = 0x3000;
-const COUNTER_CLOCKWISE = 0x500;
-
 void servo_init() {
+
   OC1CON = 0x00000000; // Nollställ oc1
   OC1CON = 0x00000006; // Sätt PWM mode on (bit 0-2), 32-bit Compare Mode bit till 0 (16 bits klocka)
-  OC1R = CLOCKWISE; // Sätt pulsstart
-  OC1RS = CLOCKWISE + 3; // Sätt pulsslut
+  servo_set_clockwise();
 }
 
 void servo_set_clockwise(){
-  OC1R = CLOCKWISE;
-  OC1RS = CLOCKWISE + 3;
+  OC1R = SERVO_CLOCKWISE;
+  OC1RS = SERVO_CLOCKWISE + 3;
 }
 
 void servo_set_counter_clockwise(){
-  OC1R = COUNTER_CLOCKWISE;
-  OC1RS = COUNTER_CLOCKWISE + 3;
+  OC1R = SERVO_COUNTER_CLOCKWISE;
+  OC1RS = SERVO_COUNTER_CLOCKWISE + 3;
 }
 
 void servo_start_rotation() {

@@ -17,7 +17,7 @@ void rfid_clear_register_bitmask(uint8_t reg, uint8_t mask);
 int rfid_command_tag(uint8_t cmd, uint8_t data[], int dlen, uint8_t *result, int *rlen);
 int rfid_request_tag(uint8_t mode, uint8_t* data);
 int rfid_anti_collision(uint8_t* serial);
-int rfid_validate_card(uint8_t cards[][4]);
+int rfid_validate_card(uint8_t cards[][5], int no_of_cards);
 
 #define     MAX_LEN               16        // Maximum length of an array.
 

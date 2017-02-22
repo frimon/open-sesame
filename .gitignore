@@ -2,3 +2,4 @@
 outfile.hex
 outfile.elf
 .deps
+.DS_Store

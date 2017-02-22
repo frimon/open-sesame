@@ -6,9 +6,7 @@
 #include <pic32mx.h>  /* Declarations of system-specific addresses etc */
 #include "mipslab.h"  /* Declatations for these labs */
 #include "rfid.h" /* Declarations for RFID */
-
-const CLOCKWISE = 0x3000;
-const COUNTER_CLOCKWISE = 0x500;
+#include "servo.h" /* Declarations for Servo */
 
 uint8_t cards[2][5] = {
   { 0x06, 0xf3, 0x25, 0xa0, 0x70 }, // Vitt RFID-kort
@@ -37,7 +35,8 @@ char* char_to_hexstring (uint8_t data) {
 /* Interrupt Service Routine */
 void user_isr( void )
 {
-  return;
+  /* Check if flag is set (every ms)*/
+  servo_interrupt();
 }
 
 /* Lab-specific initialization goes here */
@@ -46,21 +45,16 @@ void labinit( void ) {
   rfid_init();
   servo_init();
 
-  T2CON = 5 << 4;     // 1:32 scaling
-  TMR2 = 0;           // Nollställ klockan
-  PR2 = 25000;        // Räkna upp till X
-
   TRISECLR = 1; // LED på pin 26 till output
   PORTECLR = 1;
 
-  T2CONSET = 1 << 15; // Starta klockan
   return;
 }
 
 /* This function is called repetitively from the main program */
 void labwork( void )
 {
-
+  /*
   // Om timeout flaggan är 1, räkna upp timerCounter och nollställ timeoutflaggan.
   if (IFS(0) & 0x100) {
 
@@ -72,11 +66,12 @@ void labwork( void )
   if (timerCounter < 100) {
     return;
   }
-
+  */
   int no_of_cards = sizeof(cards) / sizeof(cards[0]);
   int status = rfid_validate_card(cards, no_of_cards);
   if (status) {
     PORTESET = 1;
+    servo_toggle();
   }
 
   counter++;

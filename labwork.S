@@ -24,6 +24,7 @@
 
 .global time2string
 .global delay
+.global enable_interrupt
 
 .text
 
@@ -116,3 +117,6 @@ hexasc: andi $t0, $a0, 0x0000000f # Ta med de fyra least significant bits
 		jr $ra # Returnera, dvs gå tillbaka där vi var tidigare
 		nop
 
+enable_interrupt:
+  	ei
+  	jr $ra

@@ -2,17 +2,12 @@
 #include <pic32mx.h>  /* Declarations of system-specific addresses etc */
 #include <stdint.h>   /* Declarations of uint_32 and the like */
 
-/*
-INPUT VOLTAGE = 5V
-OC1           = PIN 3  PORT D0
-*/
 int servo_time_counter;
 uint8_t servo_open;
 
 int servo_init() {
 
-  OC1CON = 0x00000000; // Nollställ oc1
-  OC1CON = 0x00000006; // Sätt PWM mode on (bit 0-2), 32-bit Compare Mode bit till 0 (16 bits klocka)
+  OC1CON = 0x00000006; // Set PWM mode on (bit 0-2), 32-bit Compare Mode bit to 0 (16 bit clock)
 
   servo_open = 1;
   servo_rotate_time(SERVO_COUNTER_CLOCKWISE, 120);
@@ -35,18 +30,18 @@ void servo_start_timer(int time) {
   servo_time_counter = time; // Set timer length
 
   T2CON = 5 << 4;     // 1:64 scaling
-  TMR2 = 0;           // Nollställ klockan
-  PR2 = 25000;        // Räkna upp till 31 250
+  TMR2 = 0;           // Reset clock
+  PR2 = 25000;        // Count up to 25 000
 
   enable_interrupt();
-  IECSET(0) = 0x00000100; // Sätt index 8 till en etta (motsvarar timer 2)
-  IPCSET(2) = 0x00000004; // Sätt prio till 4
+  IECSET(0) = 0x00000100; // Set index 8 to a 1 (timer 2)
+  IPCSET(2) = 0x00000004; // Set prio to 4
 
-  T2CONSET = 1 << 15; // Starta klockan
+  T2CONSET = 1 << 15; // Start the clock
 }
 
 void servo_stop_timer(){
-  T2CONCLR = 1 << 15; // Stoppa klockan
+  T2CONCLR = 1 << 15; // Stop the clock
 }
 
 void servo_interrupt(){

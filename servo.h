@@ -1,3 +1,8 @@
+/*
+INPUT VOLTAGE = 5V
+OC1           = PIN 3  PORT D0
+*/
+
 #define SERVO_CLOCKWISE 0x3000
 #define SERVO_COUNTER_CLOCKWISE 0x500
 

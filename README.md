@@ -1,5 +1,1 @@
-# open-sesame!!!!
-Door opener
-
-Test av fredrik
-Test 2
+![Open Sesame](https://github.com/frimon/open-sesame/raw/master/logo.png)

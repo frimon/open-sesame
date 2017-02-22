@@ -11,3 +11,4 @@ void servo_stop_timer();
 void servo_interrupt();
 void servo_toggle();
 void servo_interrupt();
+int servo_timer_active();

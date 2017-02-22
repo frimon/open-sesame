@@ -13,12 +13,13 @@ void servo_init() {
 
   OC1CON = 0x00000000; // Nollställ oc1
   OC1CON = 0x00000006; // Sätt PWM mode on (bit 0-2), 32-bit Compare Mode bit till 0 (16 bits klocka)
-  servo_set_direction(SERVO_CLOCKWISE);
+
+  servo_rotate_time(SERVO_COUNTER_CLOCKWISE, 120);
 }
 
 void servo_rotate_time(int direction, int time) {
 
-  if (!((T2CON >> 15) & 1)) {
+  if (!servo_timer_active()) {
 
     servo_set_direction(direction);
     servo_start_rotation();
@@ -59,7 +60,7 @@ void servo_interrupt(){
 
 void servo_toggle(){
 
-  if (!((T2CON >> 15) & 1)) {
+  if (!servo_timer_active()) {
     if (servo_open) {
 
       servo_rotate_time(SERVO_CLOCKWISE, 120);
@@ -83,4 +84,8 @@ void servo_start_rotation() {
 
 void servo_stop_rotation() {
   OC1CON &= 0xffff7fff;
+}
+
+int servo_timer_active(){
+  return (T2CON >> 15) & 1;
 }

@@ -7,14 +7,17 @@ INPUT VOLTAGE = 5V
 OC1           = PIN 3  PORT D0
 */
 int servo_time_counter;
-uint8_t servo_open = 1;
+uint8_t servo_open;
 
-void servo_init() {
+int servo_init() {
 
   OC1CON = 0x00000000; // Nollställ oc1
   OC1CON = 0x00000006; // Sätt PWM mode on (bit 0-2), 32-bit Compare Mode bit till 0 (16 bits klocka)
 
+  servo_open = 1;
   servo_rotate_time(SERVO_COUNTER_CLOCKWISE, 120);
+
+  return servo_open;
 }
 
 void servo_rotate_time(int direction, int time) {
@@ -58,7 +61,7 @@ void servo_interrupt(){
   }
 }
 
-void servo_toggle(){
+int servo_toggle() {
 
   if (!servo_timer_active()) {
     if (servo_open) {
@@ -71,6 +74,8 @@ void servo_toggle(){
       servo_open = 1;
     }
   }
+
+  return servo_open;
 }
 
 void servo_set_direction(int direction){

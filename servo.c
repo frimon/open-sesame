@@ -40,11 +40,11 @@ void servo_start_timer(int time) {
   T2CONSET = 1 << 15; // Start the clock
 }
 
-void servo_stop_timer(){
+void servo_stop_timer() {
   T2CONCLR = 1 << 15; // Stop the clock
 }
 
-void servo_interrupt(){
+void servo_interrupt() {
 
   servo_time_counter--;
   IFSCLR(0) = 1 << 8;
@@ -73,7 +73,8 @@ int servo_toggle() {
   return servo_open;
 }
 
-void servo_set_direction(int direction){
+void servo_set_direction(int direction) {
+
   OC1R = direction;
   OC1RS = direction + 3;
 }
@@ -86,6 +87,6 @@ void servo_stop_rotation() {
   OC1CON &= 0xffff7fff;
 }
 
-int servo_timer_active(){
+int servo_timer_active() {
   return (T2CON >> 15) & 1;
 }

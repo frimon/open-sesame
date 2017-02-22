@@ -3,6 +3,7 @@
 #include <stdint.h>   /* Declarations of uint_32 and the like */
 
 void rfid_init() {
+
   TRISGCLR = 5 << 6; // Sets SCK1 and MOSI as outputs
   TRISGSET = 1 << 7; // Sets MISO as input
   TRISECLR = 1 << 7; // Sets Slaveselect port as output
@@ -22,20 +23,26 @@ void rfid_init() {
   if (~(ant_value & 0x03)) {
     rfid_set_register_bitmask(0x14, 0x03);
   }
-
 }
-uint8_t rfid_send_data(uint8_t reg, uint8_t value){
+
+uint8_t rfid_send_data(uint8_t reg, uint8_t value) {
+
   PORTFSET = 0x10; // DISPLAY_CHANGE_TO_DATA_MODE
   PORTECLR = 1 << 7; // Sets so that RFID-reader should act as slave.
+
   spi_send_recv(reg);
   uint8_t received = spi_send_recv(value);
+
   PORTESET = 1 << 7; // Sets so that RFID-reader is no longer slave.
   PORTFCLR = 0x10; // DISPLAY_CHANGE_TO_COMMAND_MODE
+
   return received;
 }
+
 void rfid_write_register(uint8_t reg, uint8_t value) {
   rfid_send_data((reg << 1) & 0x7E, value); // First bit set to 0 for write
 }
+
 uint8_t rfid_read_register(uint8_t reg) {
   return rfid_send_data(0x80 | ((reg << 1) & 0x7E), 0); // First bit set to 1 for write
 }
